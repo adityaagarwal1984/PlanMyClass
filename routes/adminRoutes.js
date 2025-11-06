@@ -13,6 +13,10 @@ router.post('/faculty/add', ensureAdmin, adminController.addFaculty);
 router.get('/subjects', ensureAdmin, adminController.listSubjects);
 router.post('/subjects/add', ensureAdmin, adminController.addSubject);
 
+// sections
+router.get('/sections', ensureAdmin, adminController.listSections);
+router.post('/sections/add', ensureAdmin, adminController.addSection);
+
 // assign
 router.get('/assign', ensureAdmin, adminController.showAssign);
 router.post('/assign', ensureAdmin, adminController.assignSubject);

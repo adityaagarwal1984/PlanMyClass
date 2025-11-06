@@ -21,7 +21,7 @@ exports.addFaculty = async (req, res) => {
 // Subject management
 exports.listSubjects = async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM subject');
-  res.render('admin/subjects', { subjects: rows });
+  res.render('admin/subjects', { subjects: rows, message: null });
 };
 
 exports.addSubject = async (req, res) => {
@@ -40,12 +40,30 @@ exports.addSubject = async (req, res) => {
   res.redirect('/admin/subjects');
 };
 
+// Sections management
+exports.listSections = async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM section');
+  res.render('admin/sections', { sections: rows, message: null });
+};
+
+exports.addSection = async (req, res) => {
+  const { name, year } = req.body;
+  const yearNum = parseInt((year || '').toString().replace(/[^0-9]/g, ''), 10);
+  if (!name || Number.isNaN(yearNum)) {
+    const [rows] = await pool.query('SELECT * FROM section');
+    return res.render('admin/sections', { sections: rows, message: 'Invalid input — provide section name and numeric year.' });
+  }
+  await pool.query('INSERT INTO section (name, year) VALUES (?, ?)', [name, yearNum]);
+  res.redirect('/admin/sections');
+};
+
 // Assign
 exports.showAssign = async (req, res) => {
   const [sections] = await pool.query('SELECT * FROM section');
   const [subjects] = await pool.query('SELECT * FROM subject');
   const [faculty] = await pool.query('SELECT id, name FROM faculty');
-  res.render('admin/generate', { sections, subjects, faculty, assignMode: true });
+  // ensure message is always defined for the template
+  res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: null });
 };
 
 exports.assignSubject = async (req, res) => {
@@ -56,7 +74,7 @@ exports.assignSubject = async (req, res) => {
 
 exports.generatePage = async (req, res) => {
   const [sections] = await pool.query('SELECT * FROM section');
-  res.render('admin/generate', { sections });
+  res.render('admin/generate', { sections, assignMode: false, message: null });
 };
 
 // Basic timetable generation logic
