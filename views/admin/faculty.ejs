@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Faculty Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+  <div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold">Faculty Management</h1>
+      <a href="/admin" class="text-blue-600">Back</a>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow mb-6">
+      <h2 class="font-bold mb-2">Add Faculty</h2>
+      <form method="post" action="/admin/faculty/add" class="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <input name="name" placeholder="Name" class="border p-2" />
+        <input name="username" placeholder="Username" class="border p-2" />
+        <input name="password" placeholder="Password" class="border p-2" />
+        <div class="col-span-3">
+          <button class="bg-green-600 text-white p-2 rounded mt-2">Add</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="font-bold mb-2">Existing Faculty</h2>
+      <ul>
+        <% faculty.forEach(f => { %>
+          <li class="border-b py-2"><%= f.name %> — <%= f.username %></li>
+        <% }) %>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

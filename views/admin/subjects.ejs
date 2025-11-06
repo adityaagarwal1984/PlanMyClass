@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Subject Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+  <div class="container mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold">Subjects</h1>
+      <a href="/admin" class="text-blue-600">Back</a>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow mb-6">
+      <h2 class="font-bold mb-2">Add Subject</h2>
+      <form method="post" action="/admin/subjects/add" class="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <input name="name" placeholder="Name" class="border p-2" />
+        <input name="year" placeholder="Year (1-4)" class="border p-2" />
+        <input name="semester" placeholder="Semester (1/2)" class="border p-2" />
+        <div>
+          <button class="bg-green-600 text-white p-2 rounded mt-2">Add</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow">
+      <h2 class="font-bold mb-2">Existing Subjects</h2>
+      <ul>
+        <% subjects.forEach(s => { %>
+          <li class="border-b py-2"><%= s.name %> — Year <%= s.year %> Sem <%= s.semester %></li>
+        <% }) %>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

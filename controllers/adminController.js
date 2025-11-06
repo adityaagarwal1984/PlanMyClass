@@ -1,0 +1,148 @@
+const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
+
+exports.dashboard = async (req, res) => {
+  res.render('admin/dashboard');
+};
+
+// Faculty management
+exports.listFaculty = async (req, res) => {
+  const [rows] = await pool.query('SELECT id, name, username FROM faculty');
+  res.render('admin/faculty', { faculty: rows });
+};
+
+exports.addFaculty = async (req, res) => {
+  const { name, username, password } = req.body;
+  const hash = await bcrypt.hash(password, 8);
+  await pool.query('INSERT INTO faculty (name, username, password) VALUES (?, ?, ?)', [name, username, hash]);
+  res.redirect('/admin/faculty');
+};
+
+// Subject management
+exports.listSubjects = async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM subject');
+  res.render('admin/subjects', { subjects: rows });
+};
+
+exports.addSubject = async (req, res) => {
+  const { name, year, semester } = req.body;
+  await pool.query('INSERT INTO subject (name, year, semester) VALUES (?, ?, ?)', [name, year, semester]);
+  res.redirect('/admin/subjects');
+};
+
+// Assign
+exports.showAssign = async (req, res) => {
+  const [sections] = await pool.query('SELECT * FROM section');
+  const [subjects] = await pool.query('SELECT * FROM subject');
+  const [faculty] = await pool.query('SELECT id, name FROM faculty');
+  res.render('admin/generate', { sections, subjects, faculty, assignMode: true });
+};
+
+exports.assignSubject = async (req, res) => {
+  const { faculty_id, subject_id, section_id } = req.body;
+  await pool.query('INSERT INTO faculty_subject (faculty_id, subject_id, section_id) VALUES (?, ?, ?)', [faculty_id, subject_id, section_id]);
+  res.redirect('/admin/assign');
+};
+
+exports.generatePage = async (req, res) => {
+  const [sections] = await pool.query('SELECT * FROM section');
+  res.render('admin/generate', { sections });
+};
+
+// Basic timetable generation logic
+exports.generateTimetable = async (req, res) => {
+  // Admin posts: section_id
+  const { section_id } = req.body;
+  try {
+    // fetch assignments for section
+    const [assignments] = await pool.query(
+      `SELECT fs.id, fs.faculty_id, fs.subject_id, s.name AS subject_name, f.name AS faculty_name
+       FROM faculty_subject fs
+       JOIN subject s ON fs.subject_id = s.id
+       JOIN faculty f ON fs.faculty_id = f.id
+       WHERE fs.section_id = ?`,
+      [section_id]
+    );
+
+    if (assignments.length === 0) {
+      return res.render('admin/generate', { sections: [], message: 'No assignments for selected section' });
+    }
+
+    // simple timetable: Mon-Fri, periods 1..6
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const periods = [1,2,3,4,5,6];
+
+    // build a map of faculty schedules to avoid conflicts: faculty_id -> {day: Set(periods)}
+    const facultySchedule = {};
+
+    // clear existing timetable for section
+    await pool.query('DELETE FROM timetable WHERE section_id = ?', [section_id]);
+
+    const entriesToInsert = [];
+
+    // naive round-robin fill for subjects, try to avoid faculty conflicts
+    let assignIndex = 0;
+    for (const day of days) {
+      for (const period of periods) {
+        // pick next assignment candidate
+        let placed = false;
+        for (let tries = 0; tries < assignments.length; tries++) {
+          const idx = (assignIndex + tries) % assignments.length;
+          const a = assignments[idx];
+          const fId = a.faculty_id;
+
+          facultySchedule[fId] = facultySchedule[fId] || {};
+          facultySchedule[fId][day] = facultySchedule[fId][day] || new Set();
+
+          // check conflict: faculty not already teaching at this day/period in ANY section
+          // to ensure cross-section conflict-free, check in DB if this faculty is scheduled at day+period
+          const conflictRow = await pool.query('SELECT 1 FROM timetable WHERE faculty_id = ? AND day = ? AND period = ?', [fId, day, period]);
+          if (conflictRow[0].length > 0) {
+            continue; // this teacher is busy, try next
+          }
+
+          if (!facultySchedule[fId][day].has(period)) {
+            // place
+            entriesToInsert.push([section_id, day, period, a.subject_id, fId]);
+            facultySchedule[fId][day].add(period);
+            assignIndex = (idx + 1) % assignments.length;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          // no available teacher found (rare). leave empty or assign null
+          // we'll skip creating entry for this slot (or create with nulls)
+          entriesToInsert.push([section_id, day, period, null, null]);
+        }
+      }
+    }
+
+    // bulk insert
+    const placeholders = entriesToInsert.map(() => '(?,?,?,?,?)').join(',');
+    const flat = entriesToInsert.flat();
+    if (entriesToInsert.length > 0) {
+      await pool.query(
+        `INSERT INTO timetable (section_id, day, period, subject_id, faculty_id) VALUES ${placeholders}`,
+        flat
+      );
+    }
+
+    res.render('admin/generate', { message: 'Timetable generated successfully' });
+  } catch (err) {
+    console.error(err);
+    res.render('admin/generate', { message: 'Error generating timetable' });
+  }
+};
+
+exports.analytics = async (req, res) => {
+  // compute workload per faculty as number of periods assigned
+  const [rows] = await pool.query(
+    `SELECT f.name, COUNT(t.id) AS periods
+     FROM faculty f
+     LEFT JOIN timetable t ON f.id = t.faculty_id
+     GROUP BY f.id`);
+  const total = rows.reduce((s, r) => s + r.periods, 0) || 1;
+  const payload = rows.map(r => ({ name: r.name, percent: Math.round((r.periods/total)*100) }));
+  res.render('admin/analytics', { data: payload });
+};

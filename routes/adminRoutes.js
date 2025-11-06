@@ -1,0 +1,27 @@
+const express = require('express');
+const router = express.Router();
+const adminController = require('../controllers/adminController');
+const { ensureAdmin } = require('../config/auth');
+
+router.get('/', ensureAdmin, adminController.dashboard);
+
+// faculty
+router.get('/faculty', ensureAdmin, adminController.listFaculty);
+router.post('/faculty/add', ensureAdmin, adminController.addFaculty);
+
+// subjects
+router.get('/subjects', ensureAdmin, adminController.listSubjects);
+router.post('/subjects/add', ensureAdmin, adminController.addSubject);
+
+// assign
+router.get('/assign', ensureAdmin, adminController.showAssign);
+router.post('/assign', ensureAdmin, adminController.assignSubject);
+
+// generate
+router.get('/generate', ensureAdmin, adminController.generatePage);
+router.post('/generate', ensureAdmin, adminController.generateTimetable);
+
+// analytics
+router.get('/analytics', ensureAdmin, adminController.analytics);
+
+module.exports = router;
