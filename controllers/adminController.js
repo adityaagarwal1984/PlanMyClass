@@ -26,7 +26,17 @@ exports.listSubjects = async (req, res) => {
 
 exports.addSubject = async (req, res) => {
   const { name, year, semester } = req.body;
-  await pool.query('INSERT INTO subject (name, year, semester) VALUES (?, ?, ?)', [name, year, semester]);
+  // normalize year and semester to integers (forms may send strings like "3 YEAR" or "SEM 1")
+  const yearNum = parseInt((year || '').toString().replace(/[^0-9]/g, ''), 10);
+  const semNum = parseInt((semester || '').toString().replace(/[^0-9]/g, ''), 10);
+
+  if (!name || Number.isNaN(yearNum) || Number.isNaN(semNum)) {
+    // return subjects view with an error message
+    const [rows] = await pool.query('SELECT * FROM subject');
+    return res.render('admin/subjects', { subjects: rows, message: 'Invalid input — please provide subject name, numeric year and semester.' });
+  }
+
+  await pool.query('INSERT INTO subject (name, year, semester) VALUES (?, ?, ?)', [name, yearNum, semNum]);
   res.redirect('/admin/subjects');
 };
 
@@ -65,7 +75,11 @@ exports.generateTimetable = async (req, res) => {
     );
 
     if (assignments.length === 0) {
-      return res.render('admin/generate', { sections: [], message: 'No assignments for selected section' });
+      // If there are no assignments for the selected section, show the assign UI
+      const [sections] = await pool.query('SELECT * FROM section');
+      const [subjects] = await pool.query('SELECT * FROM subject');
+      const [faculty] = await pool.query('SELECT id, name FROM faculty');
+      return res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: 'No assignments for selected section' });
     }
 
     // simple timetable: Mon-Fri, periods 1..6
@@ -128,10 +142,15 @@ exports.generateTimetable = async (req, res) => {
       );
     }
 
-    res.render('admin/generate', { message: 'Timetable generated successfully' });
+    // show generate page again with sections so admin can generate for another section
+    {
+      const [sections] = await pool.query('SELECT * FROM section');
+      res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully' });
+    }
   } catch (err) {
     console.error(err);
-    res.render('admin/generate', { message: 'Error generating timetable' });
+    const [sections] = await pool.query('SELECT * FROM section');
+    res.render('admin/generate', { sections, assignMode: false, message: 'Error generating timetable' });
   }
 };
 

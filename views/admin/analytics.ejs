@@ -20,9 +20,10 @@
   </div>
 
   <script>
-    const data = <%- JSON.stringify(data || []) %>;
-    const labels = data.map(d => d.name);
-    const values = data.map(d => d.percent);
+    // Safely embed server-side `data` as JSON. Escape '<' to avoid closing the script tag accidentally.
+    const data =  JSON.stringify(data || []).replace(/</g, '\\u003c') || [];
+    const labels = (data || []).map(d => d.name);
+    const values = (data || []).map(d => d.percent);
 
     const ctx = document.getElementById('workloadChart').getContext('2d');
     new Chart(ctx, {
