@@ -62,8 +62,18 @@ exports.showAssign = async (req, res) => {
   const [sections] = await pool.query('SELECT * FROM section');
   const [subjects] = await pool.query('SELECT * FROM subject');
   const [faculty] = await pool.query('SELECT id, name FROM faculty');
+  // fetch existing assignments to show on the page
+  const [assignments] = await pool.query(
+    `SELECT fs.id, sec.name AS section_name, s.name AS subject_name, f.name AS faculty_name, fs.section_id
+     FROM faculty_subject fs
+     JOIN section sec ON fs.section_id = sec.id
+     JOIN subject s ON fs.subject_id = s.id
+     JOIN faculty f ON fs.faculty_id = f.id
+     ORDER BY sec.name, s.name`
+  );
+
   // ensure message is always defined for the template
-  res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: null });
+  res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: null, assignments });
 };
 
 exports.assignSubject = async (req, res) => {

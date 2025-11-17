@@ -41,6 +41,31 @@
           </div>
         </form>
       </div>
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-bold mb-2">Existing Assignments</h2>
+        <% if (assignments && assignments.length) { %>
+          <table class="w-full table-auto">
+            <thead>
+              <tr>
+                <th class="border p-2">Section</th>
+                <th class="border p-2">Subject</th>
+                <th class="border p-2">Faculty</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% assignments.forEach(a => { %>
+                <tr>
+                  <td class="border p-2"><%= a.section_name %></td>
+                  <td class="border p-2"><%= a.subject_name %></td>
+                  <td class="border p-2"><%= a.faculty_name %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } else { %>
+          <p class="text-gray-600">No assignments yet for any section.</p>
+        <% } %>
+      </div>
     <% } else { %>
       <div class="bg-white p-4 rounded shadow mb-6">
         <h2 class="font-bold mb-2">Generate Timetable for Section</h2>
