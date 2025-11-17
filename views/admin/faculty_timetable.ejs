@@ -14,17 +14,73 @@
     </div>
 
     <div class="bg-white p-4 rounded shadow">
-      <p class="mb-4">Select a faculty member to view their timetable (placeholder).</p>
-      <form method="get" action="/admin/faculty-timetable">
+      <p class="mb-4">Select a faculty member to view their timetable.</p>
+      <form method="get" action="/admin/faculty-timetable" class="flex items-center gap-2">
         <select name="faculty_id" class="border p-2">
+          <option value="">-- Select faculty --</option>
           <% faculty.forEach(f => { %>
-            <option value="<%= f.id %>"><%= f.name %></option>
+            <option value="<%= f.id %>" <%= (selectedFaculty && selectedFaculty.toString() === f.id.toString()) ? 'selected' : '' %>><%= f.name %></option>
           <% }) %>
         </select>
-        <button class="bg-blue-600 text-white p-2 rounded ml-2">View</button>
+        <button class="bg-blue-600 text-white p-2 rounded">View</button>
       </form>
 
-      <p class="text-gray-600 mt-4">(Timetable view not implemented yet — this is a placeholder.)</p>
+      <% if (selectedFaculty) { %>
+        <% if (periods && periods.length) { %>
+          <div class="mt-4 overflow-x-auto">
+            <table class="w-full table-auto">
+              <thead>
+                <tr>
+                  <th class="border p-2">Day</th>
+                  <% periods.forEach(p => { %>
+                    <th class="border p-2 text-center">
+                      <div><%= p.label %></div>
+                      <div class="text-sm text-gray-600"><%= p.start_time.slice(0,5) %> - <%= p.end_time.slice(0,5) %></div>
+                    </th>
+                  <% }) %>
+                </tr>
+              </thead>
+              <tbody>
+                <% days.forEach(day => { %>
+                  <tr>
+                    <td class="border p-2 font-medium"><%= day %></td>
+                    <% periods.forEach(p => {
+                         const cell = (grid[day] && grid[day][p.id]) || null;
+                    %>
+                      <td class="border p-2 text-center">
+                        <% if (cell) { %>
+                          <div class="font-medium"><%= cell.subject_name %></div>
+                          <div class="text-sm text-gray-600"><%= cell.section_name || '' %></div>
+                        <% } else { %>
+                          &mdash;
+                        <% } %>
+                      </td>
+                    <% }) %>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <!-- fallback: show simple list grouped by day/period if periods not seeded -->
+          <div class="mt-4">
+            <% if (Object.keys(grid).length) { %>
+              <% Object.keys(grid).forEach(day => { %>
+                <div class="mb-3">
+                  <h3 class="font-semibold"><%= day %></h3>
+                  <ul>
+                    <% Object.keys(grid[day]).forEach(period => { const c = grid[day][period]; %>
+                      <li><strong>Period <%= period %>:</strong> <%= c.subject_name %> — <%= c.section_name || '' %></li>
+                    <% }) %>
+                  </ul>
+                </div>
+              <% }) %>
+            <% } else { %>
+              <p class="text-gray-600 mt-2">No timetable entries for this faculty.</p>
+            <% } %>
+          </div>
+        <% } %>
+      <% } %>
     </div>
   </div>
 </body>

@@ -196,10 +196,39 @@ exports.analytics = async (req, res) => {
 
 // Admin: Faculty Timetable placeholder page
 exports.facultyTimetablePage = async (req, res) => {
-  // This page will later allow selection of a faculty and viewing their timetable.
-  // For now, show a placeholder list of faculty names.
+  // Allow selecting a faculty and viewing their timetable
   const [faculty] = await pool.query('SELECT id, name FROM faculty');
-  res.render('admin/faculty_timetable', { faculty });
+  const facultyId = req.query.faculty_id || null;
+
+  // fetch periods if present
+  let periods = [];
+  try {
+    const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id');
+    periods = _p[0] || [];
+  } catch (e) {
+    periods = [];
+  }
+
+  let grid = {};
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+  if (facultyId) {
+    const [rows] = await pool.query(
+      `SELECT t.day, t.period, s.name AS subject_name, sec.name AS section_name
+       FROM timetable t
+       LEFT JOIN subject s ON t.subject_id = s.id
+       LEFT JOIN section sec ON t.section_id = sec.id
+       WHERE t.faculty_id = ?`,
+      [facultyId]
+    );
+
+    rows.forEach(r => {
+      grid[r.day] = grid[r.day] || {};
+      grid[r.day][r.period] = { subject_name: r.subject_name, section_name: r.section_name };
+    });
+  }
+
+  res.render('admin/faculty_timetable', { faculty, periods, days, grid, selectedFaculty: facultyId });
 };
 
 // Admin: Room Allocation placeholder page
