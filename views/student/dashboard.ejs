@@ -22,7 +22,53 @@
       </form>
     </div>
 
-    <% if (timetable && timetable.length) { %>
+    <% if (periods && periods.length) { %>
+      <div class="bg-white p-4 rounded shadow mt-4 overflow-x-auto">
+        <h2 class="font-bold mb-2">Timetable</h2>
+        <table class="w-full table-auto">
+          <thead>
+            <tr>
+              <th class="border p-2">Day</th>
+              <% periods.forEach(p => { %>
+                <th class="border p-2 text-center">
+                  <div><%= p.label %></div>
+                  <div class="text-sm text-gray-600"><%= p.start_time.slice(0,5) %> - <%= p.end_time.slice(0,5) %></div>
+                </th>
+              <% }) %>
+            </tr>
+          </thead>
+          <tbody>
+            <% days.forEach(day => { %>
+              <tr>
+                <td class="border p-2 font-medium"><%= day %></td>
+                <% periods.forEach(p => {
+                     const cell = (grid[day] && grid[day][p.id]) || null;
+                %>
+                  <td class="border p-2 text-center">
+                    <% if (cell) { %>
+                      <div class="font-medium"><%= cell.subject_name %></div>
+                      <div class="text-sm text-gray-600"><%= cell.faculty_name || '' %></div>
+                    <% } else { %>
+                      &mdash;
+                    <% } %>
+                  </td>
+                <% }) %>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bg-white p-4 rounded shadow mt-4">
+        <h2 class="font-bold mb-2">Faculty & Subject List</h2>
+        <ul>
+          <% facultySubjects.forEach(fs => { %>
+            <li><%= fs.subject_name %> — <%= fs.faculty_name %></li>
+          <% }) %>
+        </ul>
+      </div>
+    <% } else if (timetable && timetable.length) { %>
+      <!-- fallback: no periods seeded, show old format -->
       <div class="bg-white p-4 rounded shadow mt-4">
         <h2 class="font-bold mb-2">Timetable</h2>
         <table class="w-full table-auto">
@@ -45,15 +91,6 @@
             <% }) %>
           </tbody>
         </table>
-      </div>
-
-      <div class="bg-white p-4 rounded shadow mt-4">
-        <h2 class="font-bold mb-2">Faculty & Subject List</h2>
-        <ul>
-          <% facultySubjects.forEach(fs => { %>
-            <li><%= fs.subject_name %> — <%= fs.faculty_name %></li>
-          <% }) %>
-        </ul>
       </div>
     <% } %>
   </div>

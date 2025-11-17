@@ -15,7 +15,42 @@
 
     <div class="bg-white p-4 rounded shadow">
       <h2 class="font-bold mb-2">Your Timetable — <%= facultyName %></h2>
-      <% if (timetable && timetable.length) { %>
+      <% if (periods && periods.length) { %>
+        <div class="overflow-x-auto">
+          <table class="w-full table-auto">
+            <thead>
+              <tr>
+                <th class="border p-2">Day</th>
+                <% periods.forEach(p => { %>
+                  <th class="border p-2 text-center">
+                    <div><%= p.label %></div>
+                    <div class="text-sm text-gray-600"><%= p.start_time.slice(0,5) %> - <%= p.end_time.slice(0,5) %></div>
+                  </th>
+                <% }) %>
+              </tr>
+            </thead>
+            <tbody>
+              <% days.forEach(day => { %>
+                <tr>
+                  <td class="border p-2 font-medium"><%= day %></td>
+                  <% periods.forEach(p => {
+                       const cell = (grid[day] && grid[day][p.id]) || null;
+                  %>
+                    <td class="border p-2 text-center">
+                      <% if (cell) { %>
+                        <div class="font-medium"><%= cell.subject_name %></div>
+                        <div class="text-sm text-gray-600"><%= cell.section_name || '' %></div>
+                      <% } else { %>
+                        &mdash;
+                      <% } %>
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else if (grid && Object.keys(grid).length) { %>
         <table class="w-full table-auto">
           <thead>
             <tr>
@@ -26,13 +61,15 @@
             </tr>
           </thead>
           <tbody>
-            <% timetable.forEach(row => { %>
-              <tr>
-                <td class="border p-2"><%= row.day %></td>
-                <td class="border p-2"><%= row.period %></td>
-                <td class="border p-2"><%= row.subject_name || '---' %></td>
-                <td class="border p-2"><%= row.section_name || '---' %></td>
-              </tr>
+            <% Object.keys(grid).forEach(day => { %>
+              <% Object.keys(grid[day]).forEach(period => { const c = grid[day][period]; %>
+                <tr>
+                  <td class="border p-2"><%= day %></td>
+                  <td class="border p-2"><%= period %></td>
+                  <td class="border p-2"><%= c.subject_name || '---' %></td>
+                  <td class="border p-2"><%= c.section_name || '---' %></td>
+                </tr>
+              <% }) %>
             <% }) %>
           </tbody>
         </table>
