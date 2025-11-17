@@ -193,3 +193,17 @@ exports.analytics = async (req, res) => {
   const payload = rows.map(r => ({ name: r.name, percent: Math.round((r.periods/total)*100) }));
   res.render('admin/analytics', { data: payload });
 };
+
+// Admin: Faculty Timetable placeholder page
+exports.facultyTimetablePage = async (req, res) => {
+  // This page will later allow selection of a faculty and viewing their timetable.
+  // For now, show a placeholder list of faculty names.
+  const [faculty] = await pool.query('SELECT id, name FROM faculty');
+  res.render('admin/faculty_timetable', { faculty });
+};
+
+// Admin: Room Allocation placeholder page
+exports.roomAllocationPage = async (req, res) => {
+  // Placeholder: later will manage rooms and their assignments.
+  res.render('admin/room_allocation');
+};

@@ -28,4 +28,8 @@ router.post('/generate', ensureAdmin, adminController.generateTimetable);
 // analytics
 router.get('/analytics', ensureAdmin, adminController.analytics);
 
+// new admin pages
+router.get('/faculty-timetable', ensureAdmin, adminController.facultyTimetablePage);
+router.get('/room-allocation', ensureAdmin, adminController.roomAllocationPage);
+
 module.exports = router;
