@@ -7,6 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
+  <div id="notify-container"></div>
   <div class="container mx-auto px-4 py-6">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-2xl font-bold">Sections</h1>
@@ -32,10 +33,17 @@
       <h2 class="font-bold mb-2">Existing Sections</h2>
       <ul>
         <% sections.forEach(s => { %>
-          <li class="border-b py-2"><%= s.name %> — Year <%= s.year %></li>
+          <li class="border-b py-2 flex justify-between items-center">
+            <div><%= s.name %> — Year <%= s.year %></div>
+            <div>
+              <button data-id="<%= s.id %>" data-type="section" class="delete-btn bg-red-500 text-white px-3 py-1 rounded">Delete</button>
+            </div>
+          </li>
         <% }) %>
       </ul>
     </div>
   </div>
+  <link rel="stylesheet" href="/css/notify.css">
+  <script src="/js/admin.js"></script>
 </body>
 </html>

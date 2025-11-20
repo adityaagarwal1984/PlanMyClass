@@ -13,8 +13,8 @@ exports.listFaculty = async (req, res) => {
 
 exports.addFaculty = async (req, res) => {
   const { name, username, password } = req.body;
-  const hash = await bcrypt.hash(password, 8);
-  await pool.query('INSERT INTO faculty (name, username, password) VALUES (?, ?, ?)', [name, username, hash]);
+  // Store faculty password as provided (plain) per user request
+  await pool.query('INSERT INTO faculty (name, username, password) VALUES (?, ?, ?)', [name, username, password]);
   res.redirect('/admin/faculty');
 };
 
@@ -84,7 +84,48 @@ exports.assignSubject = async (req, res) => {
 
 exports.generatePage = async (req, res) => {
   const [sections] = await pool.query('SELECT * FROM section');
-  res.render('admin/generate', { sections, assignMode: false, message: null });
+  const sectionId = req.query.section_id || null;
+
+  // prepare timetable data if a section is selected
+  let periods = [];
+  let grid = {};
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  let facultySubjects = [];
+
+  if (sectionId) {
+    try {
+      const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id');
+      periods = _p[0] || [];
+    } catch (e) {
+      periods = [];
+    }
+
+    const [rows] = await pool.query(
+      `SELECT t.day, t.period, s.name as subject_name, f.name as faculty_name
+       FROM timetable t
+       LEFT JOIN subject s ON t.subject_id = s.id
+       LEFT JOIN faculty f ON t.faculty_id = f.id
+       WHERE t.section_id = ?`,
+      [sectionId]
+    );
+
+    rows.forEach(r => {
+      grid[r.day] = grid[r.day] || {};
+      grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
+    });
+
+    const [fs] = await pool.query(
+      `SELECT f.name as faculty_name, s.name as subject_name
+       FROM faculty_subject fs
+       JOIN faculty f ON fs.faculty_id = f.id
+       JOIN subject s ON fs.subject_id = s.id
+       WHERE fs.section_id = ?`,
+      [sectionId]
+    );
+    facultySubjects = fs;
+  }
+
+  res.render('admin/generate', { sections, assignMode: false, message: null, periods, days, grid, facultySubjects, selectedSection: sectionId });
 };
 
 // Basic timetable generation logic
@@ -110,9 +151,19 @@ exports.generateTimetable = async (req, res) => {
       return res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: 'No assignments for selected section' });
     }
 
-    // simple timetable: Mon-Fri, periods 1..6
+    // simple timetable: Mon-Fri. Determine period ids from `periods` table if present,
+    // otherwise fall back to a default sequence 1..6.
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const periods = [1,2,3,4,5,6];
+    let periodIds = [1,2,3,4,5,6];
+    try {
+      const _pids = await pool.query('SELECT id FROM periods ORDER BY id');
+      if (_pids[0] && _pids[0].length > 0) {
+        periodIds = _pids[0].map(r => r.id);
+      }
+    } catch (e) {
+      // if periods table missing or query fails, use default periodIds
+      periodIds = [1,2,3,4,5,6];
+    }
 
     // build a map of faculty schedules to avoid conflicts: faculty_id -> {day: Set(periods)}
     const facultySchedule = {};
@@ -125,7 +176,7 @@ exports.generateTimetable = async (req, res) => {
     // naive round-robin fill for subjects, try to avoid faculty conflicts
     let assignIndex = 0;
     for (const day of days) {
-      for (const period of periods) {
+      for (const period of periodIds) {
         // pick next assignment candidate
         let placed = false;
         for (let tries = 0; tries < assignments.length; tries++) {
@@ -170,11 +221,38 @@ exports.generateTimetable = async (req, res) => {
       );
     }
 
-    // show generate page again with sections so admin can generate for another section
-    {
-      const [sections] = await pool.query('SELECT * FROM section');
-      res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully' });
-    }
+    // After generation, show generate page again with the generated timetable
+    const [sections] = await pool.query('SELECT * FROM section');
+
+    // prepare periods and grid for selected section
+    let periods = [];
+    try { const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id'); periods = _p[0] || []; } catch (e) { periods = []; }
+
+    const [rows] = await pool.query(
+      `SELECT t.day, t.period, s.name as subject_name, f.name as faculty_name
+       FROM timetable t
+       LEFT JOIN subject s ON t.subject_id = s.id
+       LEFT JOIN faculty f ON t.faculty_id = f.id
+       WHERE t.section_id = ?`,
+      [section_id]
+    );
+    const grid = {};
+    rows.forEach(r => {
+      grid[r.day] = grid[r.day] || {};
+      grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
+    });
+
+    const [fs] = await pool.query(
+      `SELECT f.name as faculty_name, s.name as subject_name
+       FROM faculty_subject fs
+       JOIN faculty f ON fs.faculty_id = f.id
+       JOIN subject s ON fs.subject_id = s.id
+       WHERE fs.section_id = ?`,
+      [section_id]
+    );
+    const facultySubjects = fs;
+
+    res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully', periods, days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], grid, facultySubjects, selectedSection: section_id });
   } catch (err) {
     console.error(err);
     const [sections] = await pool.query('SELECT * FROM section');
@@ -235,4 +313,71 @@ exports.facultyTimetablePage = async (req, res) => {
 exports.roomAllocationPage = async (req, res) => {
   // Placeholder: later will manage rooms and their assignments.
   res.render('admin/room_allocation');
+};
+
+// Delete handlers
+exports.deleteFaculty = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM faculty WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Faculty deleted' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error deleting faculty' });
+  }
+};
+
+exports.deleteSubject = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM subject WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Subject deleted' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error deleting subject' });
+  }
+};
+
+exports.deleteSection = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM section WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Section deleted' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error deleting section' });
+  }
+};
+
+exports.deleteAssignment = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM faculty_subject WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Assignment deleted' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error deleting assignment' });
+  }
+};
+
+exports.deleteTimetableEntry = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM timetable WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Timetable entry deleted' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error deleting timetable entry' });
+  }
+};
+
+exports.clearTimetableForSection = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM timetable WHERE section_id = ?', [id]);
+    return res.json({ success: true, message: 'Timetable cleared for section' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Error clearing timetable for section' });
+  }
 };

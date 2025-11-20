@@ -21,7 +21,13 @@ exports.login = async (req, res) => {
       const [rows] = await pool.query('SELECT * FROM faculty WHERE username = ?', [username]);
       if (rows.length === 0) return res.render('login', { error: 'Invalid credentials' });
       const faculty = rows[0];
-      const ok = await bcrypt.compare(password, faculty.password);
+      let ok = false;
+      // support both bcrypt-hashed and plain-text stored passwords
+      if (typeof faculty.password === 'string' && /^\$2[aby]\$/.test(faculty.password)) {
+        ok = await bcrypt.compare(password, faculty.password);
+      } else {
+        ok = (password === faculty.password);
+      }
       if (!ok) return res.render('login', { error: 'Invalid credentials' });
       req.session.user = { id: faculty.id, username: faculty.username, name: faculty.name, role: 'faculty' };
       return res.redirect('/faculty/dashboard');
