@@ -26,6 +26,6 @@ exports.dashboard = async (req, res) => {
     grid[r.day][r.period] = { subject_name: r.subject_name, section_name: r.section_name };
   });
 
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   res.render('faculty/dashboard', { periods, days, grid, facultyName: req.session.user.name });
 };

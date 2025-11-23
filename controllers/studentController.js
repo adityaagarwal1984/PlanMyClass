@@ -44,6 +44,6 @@ exports.viewSectionTimetable = async (req, res) => {
     grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
   });
 
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   res.render('student/dashboard', { sections, periods, days, grid, facultySubjects });
 };

@@ -86,34 +86,39 @@ exports.generatePage = async (req, res) => {
   const [sections] = await pool.query('SELECT * FROM section');
   const sectionId = req.query.section_id || null;
 
-  // prepare timetable data if a section is selected
+  // fetch periods once
   let periods = [];
-  let grid = {};
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-  let facultySubjects = [];
+  try {
+    const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id');
+    periods = _p[0] || [];
+  } catch (e) {
+    periods = [];
+  }
 
-  if (sectionId) {
-    try {
-      const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id');
-      periods = _p[0] || [];
-    } catch (e) {
-      periods = [];
-    }
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+  // build generated timetables for all sections so admin can always see them
+  const generatedTimetables = [];
+  for (const sec of sections) {
     const [rows] = await pool.query(
       `SELECT t.day, t.period, s.name as subject_name, f.name as faculty_name
        FROM timetable t
        LEFT JOIN subject s ON t.subject_id = s.id
        LEFT JOIN faculty f ON t.faculty_id = f.id
        WHERE t.section_id = ?`,
-      [sectionId]
+      [sec.id]
     );
-
+    const grid = {};
     rows.forEach(r => {
       grid[r.day] = grid[r.day] || {};
       grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
     });
+    generatedTimetables.push({ sectionId: sec.id, sectionName: sec.name, grid });
+  }
 
+  // if a specific section is selected, also fetch its facultySubjects for the assign/generate UI
+  let facultySubjects = [];
+  if (sectionId) {
     const [fs] = await pool.query(
       `SELECT f.name as faculty_name, s.name as subject_name
        FROM faculty_subject fs
@@ -125,7 +130,7 @@ exports.generatePage = async (req, res) => {
     facultySubjects = fs;
   }
 
-  res.render('admin/generate', { sections, assignMode: false, message: null, periods, days, grid, facultySubjects, selectedSection: sectionId });
+  res.render('admin/generate', { sections, assignMode: false, message: null, periods, days, generatedTimetables, facultySubjects, selectedSection: sectionId });
 };
 
 // Basic timetable generation logic
@@ -151,9 +156,9 @@ exports.generateTimetable = async (req, res) => {
       return res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: 'No assignments for selected section' });
     }
 
-    // simple timetable: Mon-Fri. Determine period ids from `periods` table if present,
+    // simple timetable: Mon-Sat. Determine period ids from `periods` table if present,
     // otherwise fall back to a default sequence 1..6.
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     let periodIds = [1,2,3,4,5,6];
     try {
       const _pids = await pool.query('SELECT id FROM periods ORDER BY id');
@@ -221,26 +226,31 @@ exports.generateTimetable = async (req, res) => {
       );
     }
 
-    // After generation, show generate page again with the generated timetable
+    // After generation, show generate page again with generated timetables for all sections
     const [sections] = await pool.query('SELECT * FROM section');
 
-    // prepare periods and grid for selected section
+    // fetch periods once
     let periods = [];
     try { const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id'); periods = _p[0] || []; } catch (e) { periods = []; }
 
-    const [rows] = await pool.query(
-      `SELECT t.day, t.period, s.name as subject_name, f.name as faculty_name
-       FROM timetable t
-       LEFT JOIN subject s ON t.subject_id = s.id
-       LEFT JOIN faculty f ON t.faculty_id = f.id
-       WHERE t.section_id = ?`,
-      [section_id]
-    );
-    const grid = {};
-    rows.forEach(r => {
-      grid[r.day] = grid[r.day] || {};
-      grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
-    });
+    // prepare generated timetables for all sections
+    const generatedTimetables = [];
+    for (const sec of sections) {
+      const [rows] = await pool.query(
+        `SELECT t.day, t.period, s.name as subject_name, f.name as faculty_name
+         FROM timetable t
+         LEFT JOIN subject s ON t.subject_id = s.id
+         LEFT JOIN faculty f ON t.faculty_id = f.id
+         WHERE t.section_id = ?`,
+        [sec.id]
+      );
+      const grid = {};
+      rows.forEach(r => {
+        grid[r.day] = grid[r.day] || {};
+        grid[r.day][r.period] = { subject_name: r.subject_name, faculty_name: r.faculty_name };
+      });
+      generatedTimetables.push({ sectionId: sec.id, sectionName: sec.name, grid });
+    }
 
     const [fs] = await pool.query(
       `SELECT f.name as faculty_name, s.name as subject_name
@@ -252,7 +262,7 @@ exports.generateTimetable = async (req, res) => {
     );
     const facultySubjects = fs;
 
-    res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully', periods, days: ['Monday','Tuesday','Wednesday','Thursday','Friday'], grid, facultySubjects, selectedSection: section_id });
+    res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully', periods, days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], generatedTimetables, facultySubjects, selectedSection: section_id });
   } catch (err) {
     console.error(err);
     const [sections] = await pool.query('SELECT * FROM section');
@@ -288,7 +298,7 @@ exports.facultyTimetablePage = async (req, res) => {
   }
 
   let grid = {};
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   if (facultyId) {
     const [rows] = await pool.query(

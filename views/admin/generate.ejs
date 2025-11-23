@@ -18,9 +18,10 @@
       if (typeof faculty === 'undefined') faculty = [];
       if (typeof selectedSection === 'undefined') selectedSection = null;
       if (typeof message === 'undefined') message = null;
+      if (typeof days === 'undefined') days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     %>
     <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold">Generate Timetable / Assign Subjects</h1>
+      <h1 class="text-2xl font-bold"><%= assignMode ? 'Assign Subjects' : 'Generate Timetable' %></h1>
       <a href="/admin" class="text-blue-600">Back</a>
     </div>
 
@@ -102,6 +103,66 @@
         <div class="flex items-center space-x-2">
           <button data-id="<%= selectedSection %>" class="clear-timetable-btn bg-yellow-500 text-white px-3 py-1 rounded">Clear Timetable for this section</button>
         </div>
+      </div>
+    <% } %>
+
+    <% if (!assignMode) { %>
+      <% if (typeof generatedTimetables === 'undefined') generatedTimetables = []; %>
+      <div class="mt-8">
+        <h2 class="text-2xl font-bold mb-4">Generated Timetables</h2>
+        <% if (generatedTimetables.length === 0) { %>
+          <div class="bg-white p-4 rounded shadow"><p class="text-gray-600">No timetables have been generated yet.</p></div>
+        <% } %>
+        <% generatedTimetables.forEach(gt => { %>
+        <div class="bg-white p-4 rounded shadow mb-6">
+          <h3 class="font-bold mb-2">Section: <%= gt.sectionName %></h3>
+          <div class="overflow-auto">
+            <table class="w-full table-auto border-collapse">
+              <thead>
+                <tr>
+                  <th class="border p-2">Day / Period</th>
+                  <% let pids = [];
+                     if (typeof periods !== 'undefined' && periods && periods.length) {
+                       pids = periods.map(p => p.id);
+                     } else {
+                       const firstDay = Object.keys(gt.grid)[0];
+                       pids = firstDay ? Object.keys(gt.grid[firstDay]).map(k => parseInt(k)).sort((a,b)=>a-b) : [];
+                     }
+                  %>
+                  <% pids.forEach(pid => { %>
+                    <th class="border p-2 text-center">P<%= pid %>
+                      <% if (typeof periods !== 'undefined' && periods && periods.length) {
+                           const p = periods.find(pp => pp.id === pid);
+                           if (p) { %>
+                             <div class="text-xs text-gray-600"><%= p.label %> <br/><%= p.start_time %> - <%= p.end_time %></div>
+                      <%     }
+                         }
+                      %>
+                    </th>
+                  <% }) %>
+                </tr>
+              </thead>
+              <tbody>
+                <% days.forEach(day => { %>
+                  <tr>
+                    <td class="border p-2 font-semibold"><%= day %></td>
+                    <% pids.forEach(pid => { %>
+                      <td class="border p-2 align-top">
+                        <% if (gt.grid[day] && gt.grid[day][pid]) { %>
+                          <div class="font-bold"><%= gt.grid[day][pid].subject_name || '—' %></div>
+                          <div class="text-sm text-gray-600"><%= gt.grid[day][pid].faculty_name || '' %></div>
+                        <% } else { %>
+                          <div class="text-gray-400">-</div>
+                        <% } %>
+                      </td>
+                    <% }) %>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% }) %>
       </div>
     <% } %>
 
