@@ -278,11 +278,13 @@ exports.generateTimetable = async (req, res) => {
       return res.render('admin/generate', { sections, assignMode: false, message, periods: [], days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], generatedTimetables: [], facultySubjects, selectedSection: section_id });
     }
 
-    // build slots according to hours (subjects with more hours appear earlier)
-    const slots = [];
-    for (const a of assignmentsWithHours) {
-      for (let i = 0; i < a.hours; i++) slots.push(a);
-    }
+    // build subjectsOrdered array for round-robin allocation: highest required hours first
+    const subjectsOrdered = assignmentsWithHours
+      .filter(a => a.hours > 0)
+      .map(a => ({ subject_id: a.subject_id, faculty_id: a.faculty_id, remaining: a.hours, subject_name: a.subject_name }));
+
+    // already sorted by hours desc earlier; ensure it
+    subjectsOrdered.sort((x, y) => y.remaining - x.remaining);
 
     // prepare period ids
     let periodRows = [];
@@ -361,9 +363,13 @@ exports.generateTimetable = async (req, res) => {
 
     const daysArr = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+    // round-robin pointer
+    let nextIndex = 0;
     for (const day of daysArr) {
       for (const period of periodIds) {
-        if (slots.length === 0) break;
+        // stop early if no remaining lectures
+        const totalRemaining = subjectsOrdered.reduce((s, it) => s + it.remaining, 0);
+        if (totalRemaining === 0) break;
         // skip lunch label periods
         const label = periodRows.find(p=>p.id===period)?.label || '';
         if (label.toLowerCase().includes('lunch')) continue;
@@ -371,24 +377,33 @@ exports.generateTimetable = async (req, res) => {
         if (reserved.has(`${day}|${period}`)) continue;
 
         let placed = false;
-        for (let i = 0; i < slots.length; i++) {
-          const candidate = slots[i];
-          const fId = candidate.faculty_id;
+        const n = subjectsOrdered.length;
+        if (n > 0) {
+          // try up to n subjects in round-robin order starting from nextIndex
+          for (let attempt = 0; attempt < n; attempt++) {
+            const idx = (nextIndex + attempt) % n;
+            const candidate = subjectsOrdered[idx];
+            if (!candidate || candidate.remaining <= 0) continue;
 
-          facultySchedule[fId] = facultySchedule[fId] || {};
-          facultySchedule[fId][day] = facultySchedule[fId][day] || new Set();
+            const fId = candidate.faculty_id;
+            facultySchedule[fId] = facultySchedule[fId] || {};
+            facultySchedule[fId][day] = facultySchedule[fId][day] || new Set();
 
-          // check DB for cross-section conflict
-          const conflictRow = await pool.query('SELECT 1 FROM timetable WHERE faculty_id = ? AND day = ? AND period = ?', [fId, day, period]);
-          if (conflictRow[0].length > 0) continue;
+            // check DB for cross-section conflict for this faculty
+            const conflictRow = await pool.query('SELECT 1 FROM timetable WHERE faculty_id = ? AND day = ? AND period = ?', [fId, day, period]);
+            if (conflictRow[0].length > 0) continue;
 
-          if (!facultySchedule[fId][day].has(period)) {
-            entriesToInsert.push([section_id, day, period, candidate.subject_id, fId]);
-            facultySchedule[fId][day].add(period);
-            slots.splice(i,1);
-            reserved.add(`${day}|${period}`);
-            placed = true;
-            break;
+            if (!facultySchedule[fId][day].has(period)) {
+              // place one lecture for this candidate
+              entriesToInsert.push([section_id, day, period, candidate.subject_id, fId]);
+              facultySchedule[fId][day].add(period);
+              candidate.remaining -= 1;
+              reserved.add(`${day}|${period}`);
+              placed = true;
+              // next search should continue from the following subject to keep interleaving
+              nextIndex = (idx + 1) % n;
+              break;
+            }
           }
         }
         if (!placed) {
@@ -397,7 +412,8 @@ exports.generateTimetable = async (req, res) => {
           if (!reserved.has(key)) { entriesToInsert.push([section_id, day, period, null, null]); reserved.add(key); }
         }
       }
-      if (slots.length === 0) break;
+      const totalRemainingAfter = subjectsOrdered.reduce((s, it) => s + it.remaining, 0);
+      if (totalRemainingAfter === 0) break;
     }
 
     // bulk insert all entries
