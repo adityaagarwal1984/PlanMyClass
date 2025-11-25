@@ -120,7 +120,7 @@ exports.generatePage = async (req, res) => {
   let facultySubjects = [];
   if (sectionId) {
     const [fs] = await pool.query(
-      `SELECT f.name as faculty_name, s.name as subject_name
+      `SELECT fs.id AS assignment_id, fs.subject_id, fs.faculty_id, f.name as faculty_name, s.name as subject_name
        FROM faculty_subject fs
        JOIN faculty f ON fs.faculty_id = f.id
        JOIN subject s ON fs.subject_id = s.id
@@ -156,78 +156,81 @@ exports.generateTimetable = async (req, res) => {
       return res.render('admin/generate', { sections, subjects, faculty, assignMode: true, message: 'No assignments for selected section' });
     }
 
-    // simple timetable: Mon-Sat. Determine period ids from `periods` table if present,
-    // otherwise fall back to a default sequence 1..6.
+    // simple timetable: Mon-Sat.
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    let periodIds = [1,2,3,4,5,6];
-    try {
-      const _pids = await pool.query('SELECT id FROM periods ORDER BY id');
-      if (_pids[0] && _pids[0].length > 0) {
-        periodIds = _pids[0].map(r => r.id);
-      }
-    } catch (e) {
-      // if periods table missing or query fails, use default periodIds
-      periodIds = [1,2,3,4,5,6];
+
+    // After generation, show generate page again with generated timetables for all sections
+    const [sections] = await pool.query('SELECT * FROM section');
+
+    // parse per-subject hours inputs and global flags
+    const assignmentsWithHours = assignments.map(a => {
+      const key = `hours_${a.subject_id}`;
+      const raw = req.body[key];
+      const hrs = parseInt(raw, 10);
+      return { ...a, hours: Number.isNaN(hrs) || hrs <= 0 ? 1 : hrs };
+    }).sort((x, y) => y.hours - x.hours);
+
+    const technicalTraining = !!req.body.technical_training_global;
+    const labs = !!req.body.labs_global;
+
+    // build slots according to hours (subjects with more hours appear earlier)
+    const slots = [];
+    for (const a of assignmentsWithHours) {
+      for (let i = 0; i < a.hours; i++) slots.push(a);
     }
 
-    // build a map of faculty schedules to avoid conflicts: faculty_id -> {day: Set(periods)}
-    const facultySchedule = {};
+    // simple placement loop: iterate days & periods and place slots while avoiding faculty conflicts
+    const daysArr = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let periodIds = [1,2,3,4,5,6];
+    try { const _pids = await pool.query('SELECT id FROM periods ORDER BY id'); if (_pids[0] && _pids[0].length) periodIds = _pids[0].map(r => r.id); } catch (e) { periodIds = [1,2,3,4,5,6]; }
 
     // clear existing timetable for section
     await pool.query('DELETE FROM timetable WHERE section_id = ?', [section_id]);
 
     const entriesToInsert = [];
+    // faculty schedule cache to avoid duplicates within this generation
+    const facultySchedule = {};
 
-    // naive round-robin fill for subjects, try to avoid faculty conflicts
-    let assignIndex = 0;
-    for (const day of days) {
+    // iterate through schedule slots
+    for (const day of daysArr) {
       for (const period of periodIds) {
-        // pick next assignment candidate
+        if (slots.length === 0) break;
         let placed = false;
-        for (let tries = 0; tries < assignments.length; tries++) {
-          const idx = (assignIndex + tries) % assignments.length;
-          const a = assignments[idx];
-          const fId = a.faculty_id;
+        // try each remaining slot in order until one fits
+        for (let i = 0; i < slots.length; i++) {
+          const candidate = slots[i];
+          const fId = candidate.faculty_id;
 
           facultySchedule[fId] = facultySchedule[fId] || {};
           facultySchedule[fId][day] = facultySchedule[fId][day] || new Set();
 
-          // check conflict: faculty not already teaching at this day/period in ANY section
-          // to ensure cross-section conflict-free, check in DB if this faculty is scheduled at day+period
+          // check DB for cross-section conflict
           const conflictRow = await pool.query('SELECT 1 FROM timetable WHERE faculty_id = ? AND day = ? AND period = ?', [fId, day, period]);
-          if (conflictRow[0].length > 0) {
-            continue; // this teacher is busy, try next
-          }
+          if (conflictRow[0].length > 0) continue;
 
           if (!facultySchedule[fId][day].has(period)) {
-            // place
-            entriesToInsert.push([section_id, day, period, a.subject_id, fId]);
+            entriesToInsert.push([section_id, day, period, candidate.subject_id, fId]);
             facultySchedule[fId][day].add(period);
-            assignIndex = (idx + 1) % assignments.length;
+            // remove this slot
+            slots.splice(i, 1);
             placed = true;
             break;
           }
         }
         if (!placed) {
-          // no available teacher found (rare). leave empty or assign null
-          // we'll skip creating entry for this slot (or create with nulls)
+          // no slot could be placed for this day/period; insert empty
           entriesToInsert.push([section_id, day, period, null, null]);
         }
       }
+      if (slots.length === 0) break;
     }
 
     // bulk insert
     const placeholders = entriesToInsert.map(() => '(?,?,?,?,?)').join(',');
     const flat = entriesToInsert.flat();
     if (entriesToInsert.length > 0) {
-      await pool.query(
-        `INSERT INTO timetable (section_id, day, period, subject_id, faculty_id) VALUES ${placeholders}`,
-        flat
-      );
+      await pool.query(`INSERT INTO timetable (section_id, day, period, subject_id, faculty_id) VALUES ${placeholders}`, flat);
     }
-
-    // After generation, show generate page again with generated timetables for all sections
-    const [sections] = await pool.query('SELECT * FROM section');
 
     // fetch periods once
     let periods = [];
@@ -253,7 +256,7 @@ exports.generateTimetable = async (req, res) => {
     }
 
     const [fs] = await pool.query(
-      `SELECT f.name as faculty_name, s.name as subject_name
+      `SELECT fs.id AS assignment_id, fs.subject_id, fs.faculty_id, f.name as faculty_name, s.name as subject_name
        FROM faculty_subject fs
        JOIN faculty f ON fs.faculty_id = f.id
        JOIN subject s ON fs.subject_id = s.id
@@ -262,7 +265,7 @@ exports.generateTimetable = async (req, res) => {
     );
     const facultySubjects = fs;
 
-    res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully', periods, days: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], generatedTimetables, facultySubjects, selectedSection: section_id });
+    res.render('admin/generate', { sections, assignMode: false, message: 'Timetable generated successfully', periods, days: daysArr, generatedTimetables, facultySubjects, selectedSection: section_id, technicalTraining, labs });
   } catch (err) {
     console.error(err);
     const [sections] = await pool.query('SELECT * FROM section');

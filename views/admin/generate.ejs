@@ -83,27 +83,72 @@
       </div>
     <% } else { %>
       <div class="bg-white p-4 rounded shadow mb-6">
-        <h2 class="font-bold mb-2">Generate Timetable for Section</h2>
-        <form method="post" action="/admin/generate" class="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <select name="section_id" class="border p-2">
-            <% sections.forEach(s => { %>
-              <option value="<%= s.id %>"><%= s.name %> (Year <%= s.year %>)</option>
-            <% }) %>
-          </select>
-          <div>
-            <button class="bg-blue-600 text-white p-2 rounded mt-2">Generate</button>
-          </div>
-        </form>
-      </div>
+          <h2 class="font-bold mb-2">Generate Timetable for Section</h2>
+          <form method="get" action="/admin/generate" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <select name="section_id" class="border p-2">
+              <% sections.forEach(s => { %>
+                <option value="<%= s.id %>" <%= selectedSection==s.id ? 'selected' : '' %>><%= s.name %> (<%= s.year ? ('Year ' + s.year) : '' %>)</option>
+              <% }) %>
+            </select>
+            <div>
+              <button class="bg-blue-600 text-white p-2 rounded mt-2">Load Subjects</button>
+            </div>
+          </form>
+        </div>
     <% } %>
 
     <% if (selectedSection) { %>
-      <div class="bg-white p-4 rounded shadow mt-4">
-        <h3 class="font-bold mb-2">Actions for selected section</h3>
-        <div class="flex items-center space-x-2">
-          <button data-id="<%= selectedSection %>" class="clear-timetable-btn bg-yellow-500 text-white px-3 py-1 rounded">Clear Timetable for this section</button>
+        <div class="bg-white p-4 rounded shadow mt-4">
+          <h3 class="font-bold mb-2">Actions for selected section</h3>
+          <div class="flex items-center space-x-2 mb-4">
+            <button data-id="<%= selectedSection %>" class="clear-timetable-btn bg-yellow-500 text-white px-3 py-1 rounded">Clear Timetable for this section</button>
+          </div>
+
+          <% if (typeof facultySubjects !== 'undefined' && facultySubjects && facultySubjects.length) { %>
+            <form method="post" action="/admin/generate" class="space-y-4">
+              <input type="hidden" name="section_id" value="<%= selectedSection %>">
+              <div class="overflow-auto">
+                <table class="w-full table-auto border-collapse">
+                  <thead>
+                    <tr>
+                      <th class="border p-2">Subject</th>
+                      <th class="border p-2">Assigned Faculty</th>
+                      <th class="border p-2">Lecture Hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% facultySubjects.forEach(fs => { %>
+                      <tr>
+                        <td class="border p-2"><%= fs.subject_name %></td>
+                        <td class="border p-2"><%= fs.faculty_name %></td>
+                        <td class="border p-2">
+                          <input type="number" name="hours_<%= fs.subject_id %>" min="0" value="1" class="w-24 border p-1" />
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="mt-4 p-2 border rounded bg-gray-50">
+                <label class="inline-flex items-center mr-6">
+                  <input type="checkbox" name="technical_training_global" class="form-checkbox" />
+                  <span class="ml-2">Include Technical Training (yes/no)</span>
+                </label>
+                <label class="inline-flex items-center">
+                  <input type="checkbox" name="labs_global" class="form-checkbox" />
+                  <span class="ml-2">Include Labs (yes/no)</span>
+                </label>
+              </div>
+
+              <div>
+                <button class="bg-blue-600 text-white p-2 rounded">Generate Timetable</button>
+              </div>
+            </form>
+          <% } else { %>
+            <div class="p-4 bg-yellow-50 border rounded">No subjects assigned to this section yet.</div>
+          <% } %>
         </div>
-      </div>
     <% } %>
 
     <% if (!assignMode) { %>
