@@ -324,8 +324,106 @@ exports.facultyTimetablePage = async (req, res) => {
 
 // Admin: Room Allocation placeholder page
 exports.roomAllocationPage = async (req, res) => {
-  // Placeholder: later will manage rooms and their assignments.
-  res.render('admin/room_allocation');
+  // Try to read lab allocations from database; if table doesn't exist or query fails,
+  // fall back to sample data provided by the user.
+  let labAllocations = [];
+  try {
+    const [rows] = await pool.query('SELECT lab_id, day, section, period, subject_id FROM lab_allocations ORDER BY lab_id, FIELD(day, "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"), period');
+    // If table exists and returns rows, use them
+    if (rows && rows.length) {
+      labAllocations = rows.map(r => ({ lab_id: r.lab_id, day: r.day, section: r.section, period: r.period, subject_id: r.subject_id }));
+    }
+  } catch (e) {
+    // Table may not exist; use the fallback dataset derived from user's message
+    labAllocations = [
+      // Lab 1 entries
+      { lab_id: 1, day: 'Monday', section: '3A', period: '1,2', subject_id: 8 },
+      { lab_id: 1, day: 'Monday', section: '3D', period: '3,4', subject_id: 8 },
+      { lab_id: 1, day: 'Monday', section: '3G', period: '8,9', subject_id: 8 },
+      { lab_id: 1, day: 'Tuesday', section: '3A', period: '1,2', subject_id: 12 },
+      { lab_id: 1, day: 'Tuesday', section: '3D', period: '3,4', subject_id: 12 },
+      { lab_id: 1, day: 'Tuesday', section: '3G', period: '8,9', subject_id: 12 },
+      { lab_id: 1, day: 'Wednesday', section: '3B', period: '1,2', subject_id: 8 },
+      { lab_id: 1, day: 'Wednesday', section: '3E', period: '3,4', subject_id: 8 },
+      { lab_id: 1, day: 'Wednesday', section: '3H1', period: '8,9', subject_id: 8 },
+      { lab_id: 1, day: 'Thursday', section: '3B', period: '1,2', subject_id: 12 },
+      { lab_id: 1, day: 'Thursday', section: '3E', period: '3,4', subject_id: 12 },
+      { lab_id: 1, day: 'Thursday', section: '3H1', period: '8,9', subject_id: 12 },
+      { lab_id: 1, day: 'Friday', section: '3C', period: '1,2', subject_id: 8 },
+      { lab_id: 1, day: 'Friday', section: '3F', period: '3,4', subject_id: 8 },
+      { lab_id: 1, day: 'Friday', section: '3H2', period: '8,9', subject_id: 8 },
+      { lab_id: 1, day: 'Saturday', section: '3C', period: '1,2', subject_id: 12 },
+      { lab_id: 1, day: 'Saturday', section: '3F', period: '3,4', subject_id: 12 },
+      { lab_id: 1, day: 'Saturday', section: '3H2', period: '8,9', subject_id: 12 },
+      // Lab 2 entries
+      { lab_id: 2, day: 'Monday', section: '3H1', period: '1,2', subject_id: 9 },
+      { lab_id: 2, day: 'Monday', section: '3F', period: '3,4', subject_id: 9 },
+      { lab_id: 2, day: 'Monday', section: '3E', period: '8,9', subject_id: 9 },
+      { lab_id: 2, day: 'Tuesday', section: '3H1', period: '1,2', subject_id: 10 },
+      { lab_id: 2, day: 'Tuesday', section: '3F', period: '3,4', subject_id: 10 },
+      { lab_id: 2, day: 'Tuesday', section: '3E', period: '8,9', subject_id: 10 },
+      { lab_id: 2, day: 'Wednesday', section: '3H2', period: '1,2', subject_id: 9 },
+      { lab_id: 2, day: 'Wednesday', section: '3C', period: '3,4', subject_id: 9 },
+      { lab_id: 2, day: 'Wednesday', section: '3B', period: '8,9', subject_id: 9 },
+      { lab_id: 2, day: 'Thursday', section: '3H2', period: '1,2', subject_id: 10 },
+      { lab_id: 2, day: 'Thursday', section: '3C', period: '3,4', subject_id: 10 },
+      { lab_id: 2, day: 'Thursday', section: '3B', period: '8,9', subject_id: 10 },
+      { lab_id: 2, day: 'Friday', section: '3G', period: '1,2', subject_id: 9 },
+      { lab_id: 2, day: 'Friday', section: '3D', period: '3,4', subject_id: 9 },
+      { lab_id: 2, day: 'Friday', section: '3A', period: '8,9', subject_id: 9 },
+      { lab_id: 2, day: 'Saturday', section: '3G', period: '1,2', subject_id: 10 },
+      { lab_id: 2, day: 'Saturday', section: '3D', period: '3,4', subject_id: 10 },
+      { lab_id: 2, day: 'Saturday', section: '3A', period: '8,9', subject_id: 10 }
+    ];
+  }
+
+  // Group by lab id for rendering
+  const labsGrouped = {};
+  for (const row of labAllocations) {
+    labsGrouped[row.lab_id] = labsGrouped[row.lab_id] || [];
+    labsGrouped[row.lab_id].push(row);
+  }
+
+  // fetch periods and subjects to build a proper grid
+  let periods = [];
+  try {
+    const _p = await pool.query('SELECT id, label, start_time, end_time FROM periods ORDER BY id');
+    periods = _p[0] || [];
+  } catch (e) {
+    periods = [];
+  }
+
+  // fetch subject names
+  const subjectsMap = {};
+  try {
+    const [subs] = await pool.query('SELECT id, name FROM subject');
+    subs.forEach(s => { subjectsMap[s.id] = s.name; });
+  } catch (e) {
+    // ignore
+  }
+
+  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  // build labsData: array of { labId, grid }
+  const labsData = Object.keys(labsGrouped).map(lid => {
+    const rows = labsGrouped[lid];
+    const grid = {};
+    for (const d of days) grid[d] = {};
+    for (const r of rows) {
+      // r.period may be '1,2' or '3,4' etc.
+      const pParts = (r.period || '').toString().split(',').map(x => parseInt(x, 10)).filter(Boolean);
+      for (const pid of pParts) {
+        grid[r.day] = grid[r.day] || {};
+        grid[r.day][pid] = {
+          subject_name: subjectsMap[r.subject_id] || (`#${r.subject_id}`),
+          section: r.section || ''
+        };
+      }
+    }
+    return { labId: parseInt(lid,10), grid };
+  });
+
+  res.render('admin/room_allocation', { labsData, periods, days });
 };
 
 // Delete handlers

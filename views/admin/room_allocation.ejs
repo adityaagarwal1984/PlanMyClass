@@ -14,8 +14,54 @@
     </div>
 
     <div class="bg-white p-4 rounded shadow">
-      <p class="mb-4">Room allocation management will go here. You can create rooms, assign them to sections/periods, and resolve clashes.</p>
-      <p class="text-gray-600">(Placeholder page.)</p>
+      <h2 class="font-bold mb-4">Lab Schedules</h2>
+      <% if (!labsData || labsData.length === 0) { %>
+        <div class="p-4 bg-yellow-50 rounded">No lab allocations found.</div>
+      <% } else { %>
+        <% labsData.forEach(l => { %>
+          <div class="mb-8">
+            <h3 class="font-semibold mb-2">Lab <%= l.labId %></h3>
+            <div class="overflow-auto bg-white border rounded">
+              <% if (periods && periods.length) { %>
+                <table class="w-full table-auto">
+                  <thead>
+                    <tr class="bg-gray-100">
+                      <th class="border p-2">Day</th>
+                      <% periods.forEach(p => { %>
+                        <th class="border p-2 text-center"><%= p.label %>
+                          <div class="text-xs text-gray-600"><%= p.start_time.slice(0,5) %> - <%= p.end_time.slice(0,5) %></div>
+                        </th>
+                      <% }) %>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% days.forEach(day => { %>
+                      <tr>
+                        <td class="border p-2 font-medium"><%= day %></td>
+                        <% periods.forEach(p => { %>
+                          <% const cell = (l.grid[day] && l.grid[day][p.id]) || null; %>
+                          <td class="border p-2 text-center <%= cell ? 'bg-green-50' : '' %>">
+                            <% if (p.label.toLowerCase().includes('lunch')) { %>
+                              &mdash;
+                            <% } else if (cell) { %>
+                              <div class="font-medium"><%= cell.subject_name %></div>
+                              <div class="text-sm text-gray-600"><%= cell.section %></div>
+                            <% } else { %>
+                              &mdash;
+                            <% } %>
+                          </td>
+                        <% }) %>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              <% } else { %>
+                <div class="p-4">No periods defined. Show raw allocations instead.</div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
     </div>
   </div>
 </body>
