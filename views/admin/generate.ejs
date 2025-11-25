@@ -16,6 +16,7 @@
       if (typeof sections === 'undefined') sections = [];
       if (typeof subjects === 'undefined') subjects = [];
       if (typeof faculty === 'undefined') faculty = [];
+      if (typeof periods === 'undefined') periods = [];
       if (typeof selectedSection === 'undefined') selectedSection = null;
       if (typeof message === 'undefined') message = null;
       if (typeof days === 'undefined') days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -175,7 +176,7 @@
                      }
                   %>
                   <% pids.forEach(pid => { %>
-                    <th class="border p-2 text-center">P<%= pid %>
+                    <th class="border p-2 text-center">
                       <% if (typeof periods !== 'undefined' && periods && periods.length) {
                            const p = periods.find(pp => pp.id === pid);
                            if (p) { %>
@@ -192,14 +193,24 @@
                   <tr>
                     <td class="border p-2 font-semibold"><%= day %></td>
                     <% pids.forEach(pid => { %>
-                      <td class="border p-2 align-top">
-                        <% if (gt.grid[day] && gt.grid[day][pid]) { %>
-                          <div class="font-bold"><%= gt.grid[day][pid].subject_name || '—' %></div>
-                          <div class="text-sm text-gray-600"><%= gt.grid[day][pid].faculty_name || '' %></div>
-                        <% } else { %>
-                          <div class="text-gray-400">-</div>
-                        <% } %>
-                      </td>
+                    <% 
+                      const cell = (gt.grid[day] && gt.grid[day][pid]) || null;
+                      const periodObj = (periods && periods.length) ? periods.find(pp => pp.id === pid) : null;
+                      const plabel = periodObj && periodObj.label ? periodObj.label.toString().toLowerCase() : '';
+                      let cellClass = '';
+                      if (plabel.includes('lunch')) cellClass = 'bg-yellow-100';
+                      else if (cell && cell.subject_name === 'Technical Training') cellClass = 'bg-blue-100';
+                      else if (cell && (!cell.faculty_name || String(cell.faculty_name).trim() === '')) cellClass = 'bg-green-100';
+                      else if (cell) cellClass = 'bg-red-100';
+                    %>
+                    <td class="border p-2 align-top <%= cellClass %>">
+                      <% if (cell) { %>
+                        <div class="font-bold"><%= cell.subject_name || '—' %></div>
+                        <div class="text-sm text-gray-600"><%= cell.faculty_name || '' %></div>
+                      <% } else { %>
+                        <div class="text-gray-400">-</div>
+                      <% } %>
+                    </td>
                     <% }) %>
                   </tr>
                 <% }) %>

@@ -43,8 +43,14 @@
                 <td class="border p-2 font-medium"><%= day %></td>
                 <% periods.forEach(p => {
                      const cell = (grid[day] && grid[day][p.id]) || null;
+                     const plabel = p.label ? p.label.toString().toLowerCase() : '';
+                     let cellClass = '';
+                     if (plabel.includes('lunch')) cellClass = 'bg-yellow-100';
+                     else if (cell && cell.subject_name === 'Technical Training') cellClass = 'bg-blue-100';
+                     else if (cell && (!cell.faculty_name || String(cell.faculty_name).trim() === '')) cellClass = 'bg-green-100';
+                     else if (cell) cellClass = 'bg-red-100';
                 %>
-                  <td class="border p-2 text-center">
+                  <td class="border p-2 text-center <%= cellClass %>">
                     <% if (cell) { %>
                       <div class="font-medium"><%= cell.subject_name %></div>
                       <div class="text-sm text-gray-600"><%= cell.faculty_name || '' %></div>
