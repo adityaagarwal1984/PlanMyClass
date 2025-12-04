@@ -1,0 +1,23 @@
+<%- include('layout') %>
+
+<div class="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
+  <h2 class="text-2xl font-semibold mb-4">Student Login / View Timetable</h2>
+  <% if (message) { %>
+    <div class="mb-4 text-red-600"><%= message %></div>
+  <% } %>
+  <form method="post" action="/student-login">
+    <label class="block mb-2">Unique ID</label>
+    <input name="unique_id" class="w-full p-2 border rounded mb-3" />
+
+    <label class="block mb-2">Department</label>
+    <input name="department" class="w-full p-2 border rounded mb-3" />
+
+    <label class="block mb-2">Semester</label>
+    <input name="semester" class="w-full p-2 border rounded mb-3" />
+
+    <label class="block mb-2">Section</label>
+    <input name="section" class="w-full p-2 border rounded mb-3" />
+
+    <button class="px-4 py-2 bg-indigo-600 text-white rounded">View Timetable</button>
+  </form>
+</div>

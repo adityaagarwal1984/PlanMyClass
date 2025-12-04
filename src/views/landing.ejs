@@ -1,0 +1,44 @@
+<%- include('layout') %>
+
+<section class="text-center">
+  <div class="hero max-w-4xl mx-auto mt-12 p-8 bg-white rounded-lg shadow-lg overflow-hidden">
+    <div class="flex flex-col md:flex-row items-center">
+      <div class="md:w-1/2 p-6">
+        <h1 class="text-4xl font-extrabold mb-4">Smarter Timetables, Faster Planning</h1>
+        <p class="text-gray-600 mb-4">PlanMyClass helps colleges generate balanced timetables with lab allocations, training slots and conflict checks.</p>
+        <a href="/admin-signup" class="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700">Get Started</a>
+      </div>
+      <div class="md:w-1/2 p-6">
+        <div class="relative h-48" id="hero-canvas">
+          <!-- animated SVG / canvas will be handled by /public/js/hero.js -->
+          <svg width="100%" height="100%" viewBox="0 0 400 200" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="1">
+                <stop offset="0%" stop-color="#667eea" />
+                <stop offset="100%" stop-color="#764ba2" />
+              </linearGradient>
+            </defs>
+            <rect width="100%" height="100%" rx="12" fill="url(#g1)" opacity="0.85" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <a href="/admin-login" class="card bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+      <h3 class="font-semibold">Admin Login</h3>
+      <p class="text-sm text-gray-500">Manage subjects, faculty and generate timetables.</p>
+    </a>
+
+    <a href="/faculty-login" class="card bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+      <h3 class="font-semibold">Faculty Login</h3>
+      <p class="text-sm text-gray-500">View your timetable and profile.</p>
+    </a>
+
+    <a href="/student-login" class="card bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+      <h3 class="font-semibold">Student Timetable</h3>
+      <p class="text-sm text-gray-500">View timetable by unique ID, department & section.</p>
+    </a>
+  </div>
+</section>

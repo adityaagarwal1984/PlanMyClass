@@ -1,0 +1,17 @@
+/* Basic styles and simple hero animation */
+.hero {
+  position: relative;
+}
+
+@keyframes floaty {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+#hero-canvas svg {
+  animation: floaty 6s ease-in-out infinite;
+}
+
+.card { transition: transform .18s ease, box-shadow .18s ease; }
+.card:hover { transform: translateY(-6px); }
